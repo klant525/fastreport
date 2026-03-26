@@ -1,234 +1,237 @@
 import cv2
-import pytesseract
+import easyocr
 import re
 from collections import defaultdict
+from model_db import MODEL_DB
 
-# 👉 chỉnh lại nếu path khác
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+reader = easyocr.Reader(['en'], gpu=False)
 
 
 # =========================
-# 🔹 CLEAN TEXT
+# CONFIG CHUẨN THEO MODEL
 # =========================
-def clean_line(text):
+MODEL_CONFIG = {
+    "iphone": ["64", "128", "256", "512", "1tb"],
+    "samsung": ["4/64", "4/128", "6/128", "8/128", "8/256", "12/256"],
+    "oppo": ["6/128", "8/128", "8/256", "12/256", "12/512"],
+    "realme": ["4/64", "4/128", "6/128", "8/128", "8/256"],
+    "xiaomi": ["4/64", "6/128", "8/128", "8/256", "12/256"],
+    "motorola": ["4/128", "6/128", "8/128", "8/256"]
+}
+
+
+# =========================
+# NORMALIZE
+# =========================
+def normalize(text):
     text = text.lower()
 
-    # bỏ số dài (imei, mã sản phẩm)
-    text = re.sub(r'\b\d{6,}\b', '', text)
+    text = text.replace("iph0ne", "iphone")
+    text = text.replace("ipone", "iphone")
 
-    # chuẩn hóa dấu +
+    text = text.replace("mex", "max")
+    text = text.replace("pr0", "pro")
+    text = text.replace("prs", "pro")
+
+    text = text.replace("12b", "128")
+    text = text.replace("1 28", "128")
+    text = text.replace("2 56", "256")
+    text = text.replace("25 6", "256")
+    text = text.replace("26", "256")
+    text = text.replace("12g8", "128")
+
     text = text.replace("g+", "+").replace("+g", "+")
 
-    # bỏ ký tự rác
-    text = re.sub(r'[^a-z0-9\s\+\(\)]', '', text)
+    text = text.replace("renol", "reno")
+    text = text.replace("reno1", "reno 1")
 
-    return text.strip()
-
-def normalize_model(text):
-
-    # fix iphone
-    text = text.replace("mex", "max")
-    text = text.replace("pro mex", "pro max")
-
-    # fix rom
-    text = text.replace("266", "256")
-
-    # fix oppo
-    text = text.replace("reno155g", "reno 15")
-    text = text.replace("reno1s", "reno 15")
-
-    # fix xiaomi
-    text = text.replace("1st pro", "11t pro")
-
-    # fix spacing
+    text = re.sub(r'[^a-z0-9\s\+]', ' ', text)
     text = re.sub(r'\s+', ' ', text)
 
     return text.strip()
 
-# =========================
-# 🔹 EXTRACT CONFIG
-# =========================
-def extract_config(line):
-    match = re.search(r'(\d+)\s*\+\s*(\d+)', line)
-    if match:
-        ram = match.group(1)
-        rom = match.group(2)
 
-        # fix lỗi OCR rom
-        if rom == "266":
-            rom = "256"
+# =========================
+# EXTRACT CONFIG
+# =========================
+def extract_config(text):
 
-        return f"{ram}/{rom}"
+    m = re.search(r'(\d{1,2})\s*\+\s*(\d{2,3})', text)
+    if m:
+        return f"{m.group(1)}/{m.group(2)}"
+
+    m = re.search(r'(64|128|256|512)\s*gb', text)
+    if m:
+        return m.group(1)
+
+    if "128" in text:
+        return "128"
+    if "256" in text:
+        return "256"
+
     return ""
 
 
 # =========================
-# 🔹 PROCESS MAIN
+# MATCH MODEL
 # =========================
-def process_images(image_paths):
+def match_model(text, brand):
+    for m in MODEL_DB.get(brand, []):
+        if m in text:
+            return m
+
+    for m in MODEL_DB.get(brand, []):
+        words = m.split()
+        if len(words) >= 2 and all(w in text for w in words[:2]):
+            return m
+
+    return ""
+
+
+# =========================
+# 🔥 LOCK CONFIG
+# =========================
+def lock_config(model, config, brand):
+
+    if not config:
+        return ""
+
+    allowed = MODEL_CONFIG.get(brand, [])
+
+    # iphone chỉ có ROM
+    if brand == "apple":
+        if config in allowed:
+            return config
+
+        # fallback gần đúng
+        for a in allowed:
+            if config in a:
+                return a
+
+        return ""
+
+    # android: ram/rom
+    if "/" in config:
+        if config in allowed:
+            return config
+
+        # fallback gần đúng
+        for a in allowed:
+            if config.split("/")[1] in a:
+                return a
+
+    return ""
+
+
+# =========================
+# OCR 1 ẢNH
+# =========================
+def process_single_image(path):
 
     data = defaultdict(list)
 
-    for path in image_paths:
+    img = cv2.imread(path)
+    if img is None:
+        return data
 
-        img = cv2.imread(path)
+    h, w = img.shape[:2]
 
-        # 👉 cải thiện OCR
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+    # crop bảng
+    img = img[int(h*0.25):int(h*0.8), int(w*0.1):int(w*0.95)]
 
-        text = pytesseract.image_to_string(thresh)
+    img = cv2.resize(img, None, fx=1.5, fy=1.5)
 
-        lines = text.split("\n")
+    results = reader.readtext(img)
 
-        for line in lines:
+    lines = [r[1] for r in results]
 
-            l = clean_line(line)
-            l = normalize_model(l)
+    print("OCR:", lines)
 
-            if len(l) < 5:
-                continue
+    for line in lines:
 
-            # =====================
-            # 🔹 APPLE
-            # =====================
-            if "iphone" in l:
+        l = normalize(line)
 
-                brand = "apple"
+        if len(l) < 6:
+            continue
 
-                model_match = re.search(r'iphone\s+([\w\s]+?)\s+\d+', l)
-                rom_match = re.search(r'(\d+)\s*gb', l)
+        brand = None
 
-                model = model_match.group(1).strip() if model_match else ""
-                rom = rom_match.group(1) if rom_match else ""
+        if "iphone" in l:
+            brand = "apple"
+        elif "samsung" in l or "galaxy" in l:
+            brand = "samsung"
+        elif "oppo" in l:
+            brand = "oppo"
+        elif "realme" in l:
+            brand = "realme"
+        elif "xiaomi" in l or "redmi" in l or "poco" in l:
+            brand = "xiaomi"
+        elif "moto" in l:
+            brand = "motorola"
 
-                if not model:
-                    continue
+        if not brand:
+            continue
 
-                item = f"iPhone {model.title()} ({rom})"
+        model = match_model(l, brand)
+        if not model:
+            continue
 
-            # =====================
-            # 🔹 SAMSUNG
-            # =====================
-            elif "samsung" in l or "galaxy" in l:
+        config = extract_config(l)
+        config = lock_config(model, config, brand)
 
-                brand = "samsung"
-
-                model_match = re.search(r'a\s?\d{2,3}', l)
-                model = model_match.group(0).replace(" ", "").upper() if model_match else ""
-
-                config = extract_config(l)
-
-                if not model:
-                    continue
-
-                item = f"{model} ({config})"
-
-            # =====================
-            # 🔹 OPPO
-            # =====================
-            elif "oppo" in l:
-
-                brand = "oppo"
-
-                config = extract_config(l)
-
-                if "reno" in l:
-                    model_match = re.search(r'reno\s?\d+\s?\w*', l)
-                    model = model_match.group(0).replace(" ", "").upper() if model_match else ""
-
-                elif "find" in l:
-                    model_match = re.search(r'find\s?x\d+', l)
-                    model = model_match.group(0).title() if model_match else ""
-
-                elif re.search(r'a\d+', l):
-                    model = re.search(r'a\d+', l).group(0).upper()
-
-                else:
-                    continue  # bỏ dòng lỗi
-
-                if not model:
-                    continue
-
-                item = f"{model} ({config})"
-
-            # =====================
-            # 🔹 REALME
-            # =====================
-            elif "realme" in l:
-
-                brand = "realme"
-
-                model_match = re.search(r'c\d+', l)
-                config = extract_config(l)
-
-                model = model_match.group(0).upper() if model_match else ""
-
-                if not model:
-                    continue
-
-                item = f"{model} ({config})"
-
-            # =====================
-            # 🔹 XIAOMI
-            # =====================
-            elif "xiaomi" in l:
-
-                brand = "xiaomi"
-
-                model_match = re.search(r'xiaomi\s+([\w\s]+?)\s+\(', l)
-                config = extract_config(l)
-
-                model = model_match.group(1).strip() if model_match else ""
-
-                if not model:
-                    continue
-
-                item = f"{model.title()} ({config})"
-
-            else:
-                continue
-
-            # 👉 add từng máy (KHÔNG gộp)
-            data[brand].append(item)
+        if config:
+            data[brand].append(f"{model} ({config})")
+        else:
+            data[brand].append(model)
 
     return data
 
 
 # =========================
-# 🔹 FORMAT REPORT
+# MULTI IMAGE
+# =========================
+def process_images(image_paths):
+
+    final = defaultdict(list)
+
+    for path in image_paths:
+        single = process_single_image(path)
+
+        for k, v in single.items():
+            final[k].extend(v)
+
+    return final
+
+
+# =========================
+# FORMAT
 # =========================
 def format_report(data):
 
-    def build(name, flag, label=None):
+    def build(name, flag):
         items = data.get(name, [])
 
-        # 👉 đếm theo model
         count = {}
         for i in items:
             key = i.lower()
             count[key] = count.get(key, 0) + 1
+
         total = sum(count.values())
 
-        title = label if label else name.capitalize()
+        text = f"{flag} {name.upper()}:\n"
 
-        text = f"{flag} {title}:\n"
-
-        for model, qty in count.items():
+        for model, qty in sorted(count.items()):
             text += f"{qty} {model}\n"
 
         text += f"\nTotal: {total}\n\n"
         return text
 
     result = ""
-
-    result += build("samsung", "🇰🇷", "Samsung")
-    result += build("apple", "🇺🇸", "Co.A")
-    result += build("oppo", "🇨🇳", "Oppo")
-    result += build("xiaomi", "🇨🇳", "Xiaomi")
-    result += build("vivo", "🇨🇳", "Vivo")
-    result += build("realme", "🇨🇳", "Realme")
-    result += build("motorola", "🇨🇳", "Motorola")
-    result += build("other", "🏴", "Other")
+    result += build("samsung", "🇰🇷")
+    result += build("apple", "🇺🇸")
+    result += build("oppo", "🇨🇳")
+    result += build("xiaomi", "🇨🇳")
+    result += build("realme", "🇨🇳")
+    result += build("motorola", "🇨🇳")
 
     return result

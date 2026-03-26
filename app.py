@@ -3,7 +3,7 @@ import os
 import uuid
 from report_models_dayly import process_images, format_report
 from report_models_weekly import process_images_weekly
-
+from model_db import MODEL_DB
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
@@ -15,6 +15,7 @@ def index():
     if request.method == "POST":
 
         files = request.files.getlist("images")
+
         paths = []
 
         for file in files:
