@@ -1,4 +1,4 @@
-MODEL_DB = {
+BASE_MODEL_DB = {
 
     "apple": [
         "iphone 11","iphone 11 pro","iphone 11 pro max",
@@ -30,29 +30,18 @@ MODEL_DB = {
     ],
 
     "oppo": [
-        "reno 11","reno 11 f","reno 11 pro",
-        "reno 12","reno 12 f","reno 12 pro",
-        "reno 13","reno 13 f",
+        "reno 14","reno 14 f","reno 14 pro",
         "reno 15","reno 15 f","reno 15 pro",
-
-        "a16","a17","a18","a54","a55","a57","a58","a78",
-
-        "find x5","find x7","find x8","find x9"
     ],
 
     "realme": [
-        "c51","c53","c55","c61","c63","c65","c67","c71","c75","c85",
-        "realme 9","realme 10","realme 11","realme 12"
+        "realme note 60",
+        "c61","c65","c67","c71","c75"
     ],
 
     "xiaomi": [
-        "xiaomi 11t","xiaomi 11t pro",
-        "xiaomi 12","xiaomi 12 pro",
-        "xiaomi 13","xiaomi 13 pro",
-        "xiaomi 14","xiaomi 14 ultra",
-
-        "redmi note 11","redmi note 12","redmi note 13","redmi note 14",
-
+        "redmi note 14","redmi note 14 pro",
+        "redmi note 15","redmi note 15 5g","redmi note 15 pro",
         "poco x5","poco x6","poco x7","poco x7 pro"
     ],
 
@@ -61,3 +50,5 @@ MODEL_DB = {
         "edge 30","edge 40","edge 50"
     ]
 }
+
+MODEL_DB = BASE_MODEL_DB

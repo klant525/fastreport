@@ -1,21 +1,650 @@
 <!DOCTYPE html>
-<html>
-<body>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fast Reports</title>
+<style>
+:root {
+    --bg: #f6f1e8;
+    --paper: rgba(255, 251, 245, 0.92);
+    --card: #fffdf8;
+    --ink: #221d18;
+    --muted: #6b6258;
+    --line: rgba(34, 29, 24, 0.1);
+    --accent: #d86f45;
+    --accent-dark: #b6532c;
+    --accent-soft: rgba(216, 111, 69, 0.12);
+    --shadow: 0 24px 60px rgba(52, 33, 19, 0.12);
+    --radius-xl: 28px;
+    --radius-lg: 20px;
+    --radius-md: 14px;
+}
 
-    <!-- MENU -->
-    <div style="margin-bottom: 20px;">
-        <a href="/">📅 Daily</a> | 
-        <a href="/weekly">📊 Weekly</a>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-family: "Segoe UI", sans-serif;
+    color: var(--ink);
+    background:
+        radial-gradient(circle at top left, rgba(216, 111, 69, 0.18), transparent 30%),
+        radial-gradient(circle at top right, rgba(99, 143, 119, 0.16), transparent 28%),
+        linear-gradient(180deg, #fbf7f1 0%, var(--bg) 100%);
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image: linear-gradient(rgba(34, 29, 24, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 29, 24, 0.02) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent);
+}
+
+.container {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.brand {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+h1 {
+    margin: 0;
+    font-size: clamp(28px, 5vw, 48px);
+    line-height: 0.98;
+}
+
+.subtitle {
+    margin: 0;
+    color: var(--muted);
+    max-width: 680px;
+}
+
+.nav {
+    display: inline-flex;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    padding: 8px;
+    border-radius: 999px;
+    backdrop-filter: blur(18px);
+}
+
+.nav a {
+    text-decoration: none;
+    color: var(--muted);
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+.nav a.active {
+    color: white;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+    box-shadow: 0 12px 24px rgba(216, 111, 69, 0.25);
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 22px;
+}
+
+.layout > * {
+    min-width: 0;
+}
+
+.card {
+    background: var(--paper);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px);
+    min-width: 0;
+}
+
+.hero,
+.result-card,
+.tips {
+    padding: 24px;
+}
+
+.section-title {
+    margin: 0 0 10px;
+    font-size: 22px;
+}
+
+.section-text {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+.drop-zone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin-top: 18px;
+    border: 2px dashed rgba(216, 111, 69, 0.4);
+    border-radius: 24px;
+    min-height: 220px;
+    width: 100%;
+    padding: 24px 20px;
+    text-align: center;
+    background: linear-gradient(180deg, rgba(216, 111, 69, 0.08), rgba(255, 255, 255, 0.65));
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    background: linear-gradient(180deg, rgba(216, 111, 69, 0.15), rgba(255, 255, 255, 0.78));
+}
+
+.drop-zone strong {
+    display: block;
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+.drop-zone span {
+    color: var(--muted);
+    max-width: 420px;
+}
+
+.actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+}
+
+button,
+.button-link {
+    border: 0;
+    border-radius: 999px;
+    padding: 13px 18px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+button.primary,
+.button-link.primary {
+    color: white;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+    box-shadow: 0 16px 30px rgba(216, 111, 69, 0.24);
+}
+
+button.secondary,
+.button-link.secondary {
+    color: var(--ink);
+    background: white;
+    border: 1px solid var(--line);
+}
+
+button:hover,
+.button-link:hover {
+    transform: translateY(-1px);
+}
+
+.meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: white;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.preview-grid {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 12px;
+}
+
+.preview-item {
+    aspect-ratio: 1;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #efe8df;
+    position: relative;
+    border: 1px solid rgba(34, 29, 24, 0.06);
+}
+
+.preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.preview-item span {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 5px 8px;
+    border-radius: 10px;
+    background: rgba(34, 29, 24, 0.68);
+    color: white;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.result-shell {
+    border-radius: 24px;
+    background: #1c1b19;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+textarea {
+    width: 100%;
+    max-width: 100%;
+    min-height: 420px;
+    border: 0;
+    resize: vertical;
+    border-radius: 18px;
+    padding: 18px;
+    background: #0f0f0f;
+    color: #f3f0eb;
+    font: 500 14px/1.6 "Consolas", "Courier New", monospace;
+}
+
+.empty-state {
+    border: 1px dashed var(--line);
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 22px;
+    padding: 24px;
+    color: var(--muted);
+    line-height: 1.7;
+}
+
+.alert {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: rgba(170, 60, 45, 0.08);
+    color: #8e3025;
+    border: 1px solid rgba(170, 60, 45, 0.14);
+}
+
+.tips ul {
+    margin: 14px 0 0;
+    padding-left: 18px;
+    color: var(--muted);
+    line-height: 1.8;
+}
+
+.detail-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.detail-item {
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--line);
+}
+
+.detail-name {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.detail-meta {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    word-break: break-word;
+}
+
+.footer-note {
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+@media (max-width: 920px) {
+    .layout {
+        grid-template-columns: 1fr;
+    }
+
+    .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    textarea {
+        min-height: 320px;
+    }
+
+    .container {
+        padding: 16px 12px 28px;
+    }
+
+    .card,
+    .hero,
+    .result-card,
+    .tips {
+        padding: 18px;
+    }
+
+    .nav {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .drop-zone {
+        min-height: 180px;
+        padding: 20px 16px;
+    }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="topbar">
+        <div class="brand">
+            <div class="eyebrow">FastReport OCR</div>
+            <h1>Daily Model Scanner</h1>
+            <p class="subtitle">Upload anh bang gia, he thong se OCR tung anh, tach model va quy doi ve dung cau hinh da khai bao. Ket qua chi dung cho request hien tai va khong bi cache tren web.</p>
+        </div>
+
+        <nav class="nav">
+            <a class="active" href="/">Daily</a>
+            <a href="/weekly">Weekly</a>
+        </nav>
     </div>
 
-    <!-- TITLE -->
-    <h2>Upload ảnh để thống kê</h2>
+    <div class="layout">
+        <section class="card hero">
+            <h2 class="section-title">Tai anh len de chay bao cao</h2>
+            <p class="section-text">Toi uu cho VPS RAM thap: gioi han toi da 12 anh moi lan, xu ly xong se xoa file tam ngay.</p>
 
-    <!-- FORM -->
-    <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="images" multiple>
-        <button type="submit">Chạy</button>
-    </form>
+            <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                <label class="drop-zone" id="dropZone">
+                    <strong>Keo tha anh vao day</strong>
+                    <span>Hoac bam de chon nhieu anh tu may. Nen dung anh crop ro model de OCR nhanh hon.</span>
+                    <input type="file" name="images" id="fileInput" accept="image/*" multiple hidden>
+                </label>
 
+                <div class="meta-row">
+                    <div class="badge" id="fileCountBadge">0 anh da chon</div>
+                    <div class="badge">Toi da 12 anh / lan</div>
+                    <div class="badge">Khong luu ket qua cu</div>
+                    <div class="badge">
+                        {{ catalog_meta.get('source', 'base') }}
+                        {% if catalog_meta.get('updated_at') %}- {{ catalog_meta.get('updated_at')[:16].replace('T', ' ') }}{% endif %}
+                    </div>
+                </div>
+
+                {% if error %}
+                <div class="alert">{{ error }}</div>
+                {% endif %}
+
+                <div class="preview-grid" id="previewGrid"></div>
+
+                <div class="actions">
+                    <button class="primary" type="submit" id="submitButton">Chay bao cao</button>
+                    <button class="secondary" type="button" id="clearButton">Xoa anh da chon</button>
+                </div>
+            </form>
+
+            <div class="footer-note">Moi lan tai len la mot luot xu ly moi. Khi refresh trang, ket qua cu se khong duoc giu lai.</div>
+        </section>
+
+        <div>
+            <section class="card result-card">
+                <div class="result-header">
+                    <div>
+                        <h2 class="section-title">Ket qua daily</h2>
+                        <p class="section-text">{% if report %}Da xu ly {{ file_count }} anh.{% else %}Chua co ket qua. Tai anh len de bat dau.{% endif %}</p>
+                    </div>
+                    {% if report %}
+                    <div class="actions" style="margin-top:0;">
+                        <button class="secondary" type="button" id="copyButton">Copy</button>
+                        <button class="secondary" type="button" id="downloadButton">Tai TXT</button>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if report %}
+                <div class="result-shell">
+                    <textarea id="resultBox" readonly>{{ report }}</textarea>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    Ket qua se hien o day sau khi OCR xong. Neu ban muon minh nhung mot template dep hon nua, cu gui mau giao dien ban thich, minh se rap vao bo UI nay cho ban.
+                </div>
+                {% endif %}
+            </section>
+
+            <section class="card tips">
+                <h2 class="section-title">Meo de OCR nhanh va dung</h2>
+                <p class="section-text">Voi VPS 1GB RAM, mot vai dieu nho se giup OCR on dinh hon.</p>
+                <ul>
+                    <li>Dung anh crop gan khu vuc ten may va cau hinh thay vi chup nguyen man hinh dai.</li>
+                    <li>Tranh tai mot luc qua nhieu anh lon, he thong da tu gioi han 12 anh moi request.</li>
+                    <li>Neu OCR hay nham, uu tien anh sang ro, chu dam va it bong moire.</li>
+                </ul>
+            </section>
+
+            {% if details %}
+            <section class="card tips">
+                <h2 class="section-title">Ket qua tung anh</h2>
+                <p class="section-text">Moi anh duoc chot 1 model/config tot nhat, sau do moi cong don vao bao cao tong.</p>
+                <div class="detail-list">
+                    {% for item in details %}
+                    <div class="detail-item">
+                        <div class="detail-name">Anh {{ loop.index }}</div>
+                        <div class="detail-meta">
+                            {% if item["items"] %}
+                            {% for matched in item["items"] %}
+                            <div>{{ matched.qty }} x {{ matched.label }} | brand: {{ matched.brand }}</div>
+                            {% endfor %}
+                            {% else %}
+                            Khong nhan ra model nao tu anh nay.
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+const maxFiles = 12;
+const uploadForm = document.getElementById("uploadForm");
+const fileInput = document.getElementById("fileInput");
+const dropZone = document.getElementById("dropZone");
+const previewGrid = document.getElementById("previewGrid");
+const fileCountBadge = document.getElementById("fileCountBadge");
+const clearButton = document.getElementById("clearButton");
+const submitButton = document.getElementById("submitButton");
+const resultBox = document.getElementById("resultBox");
+const copyButton = document.getElementById("copyButton");
+const downloadButton = document.getElementById("downloadButton");
+
+const dataTransfer = new DataTransfer();
+let autoSubmitTimer = null;
+
+function syncInput() {
+    fileInput.files = dataTransfer.files;
+    const count = dataTransfer.files.length;
+    fileCountBadge.textContent = `${count} anh da chon`;
+    submitButton.disabled = count === 0;
+    submitButton.style.opacity = count === 0 ? "0.6" : "1";
+}
+
+function queueAutoSubmit() {
+    if (autoSubmitTimer) {
+        clearTimeout(autoSubmitTimer);
+    }
+
+    if (dataTransfer.files.length === 0) {
+        return;
+    }
+
+    submitButton.textContent = "Dang xu ly...";
+    autoSubmitTimer = setTimeout(() => {
+        uploadForm.requestSubmit();
+    }, 250);
+}
+
+function renderPreview() {
+    previewGrid.innerHTML = "";
+
+    Array.from(dataTransfer.files).forEach((file) => {
+        const item = document.createElement("div");
+        item.className = "preview-item";
+
+        const image = document.createElement("img");
+        image.src = URL.createObjectURL(file);
+        image.onload = () => URL.revokeObjectURL(image.src);
+
+        const label = document.createElement("span");
+        label.textContent = file.name;
+
+        item.appendChild(image);
+        item.appendChild(label);
+        previewGrid.appendChild(item);
+    });
+}
+
+function ingestFiles(fileList) {
+    for (const file of Array.from(fileList)) {
+        if (dataTransfer.files.length >= maxFiles) {
+            break;
+        }
+        if (file.type && !file.type.startsWith("image/")) {
+            continue;
+        }
+        dataTransfer.items.add(file);
+    }
+
+    syncInput();
+    renderPreview();
+}
+
+dropZone.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", (event) => {
+    dataTransfer.items.clear();
+    ingestFiles(event.target.files);
+    queueAutoSubmit();
+});
+
+dropZone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    dropZone.classList.add("dragover");
+});
+
+dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("dragover");
+});
+
+dropZone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    dropZone.classList.remove("dragover");
+    dataTransfer.items.clear();
+    ingestFiles(event.dataTransfer.files);
+    queueAutoSubmit();
+});
+
+clearButton.addEventListener("click", () => {
+    if (autoSubmitTimer) {
+        clearTimeout(autoSubmitTimer);
+    }
+    dataTransfer.items.clear();
+    syncInput();
+    renderPreview();
+    submitButton.textContent = "Chay bao cao";
+});
+
+if (copyButton && resultBox) {
+    copyButton.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(resultBox.value);
+        copyButton.textContent = "Da copy";
+        setTimeout(() => {
+            copyButton.textContent = "Copy";
+        }, 1200);
+    });
+}
+
+if (downloadButton && resultBox) {
+    downloadButton.addEventListener("click", () => {
+        const blob = new Blob([resultBox.value], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "daily-report.txt";
+        link.click();
+        URL.revokeObjectURL(url);
+    });
+}
+
+syncInput();
+</script>
 </body>
 </html>

@@ -1,8 +1,29 @@
 import cv2
+import gc
 import pytesseract
 from collections import defaultdict
 
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+cv2.setNumThreads(1)
+
+MAX_IMAGE_SIDE = 1080
+
+
+def shrink_for_ocr(img):
+    h, w = img.shape[:2]
+    longest = max(h, w)
+
+    if longest <= MAX_IMAGE_SIDE:
+        return img
+
+    scale = MAX_IMAGE_SIDE / float(longest)
+    new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
+    return cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+
+
+def build_ocr_gray(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    return cv2.GaussianBlur(gray, (3, 3), 0)
 
 def process_images_weekly(image_paths):
 
@@ -11,7 +32,12 @@ def process_images_weekly(image_paths):
     for path in image_paths:
 
         img = cv2.imread(path)
-        text = pytesseract.image_to_string(img)
+        if img is None:
+            continue
+
+        img = shrink_for_ocr(img)
+        gray = build_ocr_gray(img)
+        text = pytesseract.image_to_string(gray)
 
         lines = text.split("\n")
 
@@ -45,5 +71,10 @@ def process_images_weekly(image_paths):
         # 👉 cộng theo ảnh (logic tuần)
         for b in found:
             brands[b] += 1
+
+        del img
+        del gray
+        del text
+        gc.collect()
 
     return brands

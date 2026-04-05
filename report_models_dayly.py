@@ -1,27 +1,84 @@
 import cv2
 import easyocr
+import gc
 import re
 from collections import defaultdict
-from model_db import MODEL_DB
+from catalog_runtime import get_config_map, get_model_db
 
-reader = easyocr.Reader(['en'], gpu=False)
+cv2.setNumThreads(1)
+
+MAX_IMAGE_SIDE = 1080
+
+reader = None
+
+
+def get_reader():
+    global reader
+    if reader is None:
+        reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+    return reader
+
+
+def clear_ocr_resources():
+    global reader
+    reader = None
+    gc.collect()
+
+
+def shrink_for_ocr(img):
+    h, w = img.shape[:2]
+    longest = max(h, w)
+
+    if longest <= MAX_IMAGE_SIDE:
+        return img
+
+    scale = MAX_IMAGE_SIDE / float(longest)
+    new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
+    return cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+
+
+def build_ocr_variants(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    contrast = clahe.apply(gray)
+    binary = cv2.adaptiveThreshold(
+        contrast,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        31,
+        11,
+    )
+
+    return gray, binary
+
+
+def read_text_lines(img_variant):
+    lines = get_reader().readtext(
+        img_variant,
+        detail=0,
+        paragraph=False,
+        decoder="greedy",
+        batch_size=1,
+        mag_ratio=1.0,
+        text_threshold=0.45,
+        low_text=0.25,
+        link_threshold=0.2,
+        width_ths=0.7,
+        height_ths=0.7,
+    )
+    return [line for line in lines if line and line.strip()]
 
 
 # =========================
-# CONFIG CHUẨN THEO MODEL
+# CONFIG CHUẨN
 # =========================
-MODEL_CONFIG = {
-    "iphone": ["64", "128", "256", "512", "1tb"],
-    "samsung": ["4/64", "4/128", "6/128", "8/128", "8/256", "12/256"],
-    "oppo": ["6/128", "8/128", "8/256", "12/256", "12/512"],
-    "realme": ["4/64", "4/128", "6/128", "8/128", "8/256"],
-    "xiaomi": ["4/64", "6/128", "8/128", "8/256", "12/256"],
-    "motorola": ["4/128", "6/128", "8/128", "8/256"]
-}
 
 
 # =========================
-# NORMALIZE
+# NORMALIZE (FIX BUG A26 -> A25)
 # =========================
 def normalize(text):
     text = text.lower()
@@ -33,17 +90,22 @@ def normalize(text):
     text = text.replace("pr0", "pro")
     text = text.replace("prs", "pro")
 
+    # 🔥 FIX: không replace "26" nữa (gây sai model)
     text = text.replace("12b", "128")
     text = text.replace("1 28", "128")
     text = text.replace("2 56", "256")
     text = text.replace("25 6", "256")
-    text = text.replace("26", "256")
     text = text.replace("12g8", "128")
 
     text = text.replace("g+", "+").replace("+g", "+")
 
     text = text.replace("renol", "reno")
-    text = text.replace("reno1", "reno 1")
+    text = text.replace("note5g", "note 5g")
+
+    text = re.sub(r'(reno)\s*(\d{2})', r'\1 \2', text)
+    text = re.sub(r'(note)\s*(\d{2})', r'\1 \2', text)
+    text = re.sub(r'(c)\s*(\d{2})', r'\1\2', text)
+    text = re.sub(r'(\d)\s*(gb|tb)\b', r'\1\2', text)
 
     text = re.sub(r'[^a-z0-9\s\+]', ' ', text)
     text = re.sub(r'\s+', ' ', text)
@@ -52,79 +114,130 @@ def normalize(text):
 
 
 # =========================
-# EXTRACT CONFIG
+# EXTRACT CONFIG (FIX MẠNH)
 # =========================
 def extract_config(text):
 
-    m = re.search(r'(\d{1,2})\s*\+\s*(\d{2,3})', text)
+    # RAM/ROM
+    m = re.search(r'(\d{1,2})\s*[/+]\s*(\d{2,4})', text)
     if m:
         return f"{m.group(1)}/{m.group(2)}"
 
-    m = re.search(r'(64|128|256|512)\s*gb', text)
+    # chỉ ROM
+    m = re.search(r'(64|128|256|512|1024)\s*(gb|tb)', text)
     if m:
-        return m.group(1)
+        value = m.group(1)
+        unit = m.group(2)
+        return "1tb" if value == "1024" or unit == "tb" else value
 
+    # fallback thông minh
     if "128" in text:
         return "128"
     if "256" in text:
         return "256"
+    if "512" in text:
+        return "512"
 
     return ""
 
 
 # =========================
-# MATCH MODEL
+# MATCH MODEL (FIX CHÍNH XÁC HƠN)
 # =========================
 def match_model(text, brand):
-    for m in MODEL_DB.get(brand, []):
-        if m in text:
+    candidates = get_model_db().get(brand, [])
+    compact_text = text.replace(" ", "")
+
+    # 🔥 sort theo độ dài giảm dần (quan trọng)
+    candidates = sorted(candidates, key=lambda x: -len(x))
+
+    # match chính xác trước
+    for m in candidates:
+        if m in text or m.replace(" ", "") in compact_text:
             return m
 
-    for m in MODEL_DB.get(brand, []):
+    # fallback OCR sai nhẹ
+    for m in candidates:
         words = m.split()
-        if len(words) >= 2 and all(w in text for w in words[:2]):
+        if len(words) >= 2 and all(w in text for w in words):
             return m
 
     return ""
 
 
+def detect_brand_and_model(text):
+    model_db = get_model_db()
+    brand_hints = [
+        ("apple", ("iphone",)),
+        ("samsung", ("samsung", "galaxy")),
+        ("oppo", ("oppo", "reno")),
+        ("realme", ("realme",)),
+        ("xiaomi", ("xiaomi", "redmi", "poco")),
+        ("motorola", ("motorola", "moto")),
+    ]
+
+    for brand, hints in brand_hints:
+        if any(hint in text for hint in hints):
+            model = match_model(text, brand)
+            if model:
+                return brand, model
+
+    for brand in model_db:
+        model = match_model(text, brand)
+        if model:
+            return brand, model
+
+    return None, ""
+
+
+def make_label(model, config):
+    return f"{model} ({config})" if config else model
+
+
 # =========================
-# 🔥 LOCK CONFIG
+# LOCK CONFIG
 # =========================
 def lock_config(model, config, brand):
 
     if not config:
         return ""
 
-    allowed = MODEL_CONFIG.get(brand, [])
+    allowed = [item.lower() for item in get_config_map().get(model, [])]
+    config = config.lower()
 
-    # iphone chỉ có ROM
+    if not allowed:
+        return config
+
+    # iphone
     if brand == "apple":
         if config in allowed:
             return config
 
-        # fallback gần đúng
+        # fallback gần nhất
         for a in allowed:
             if config in a:
                 return a
 
-        return ""
+        return allowed[0]
 
-    # android: ram/rom
+    # android
     if "/" in config:
         if config in allowed:
             return config
 
-        # fallback gần đúng
         for a in allowed:
-            if config.split("/")[1] in a:
+            if config.split("/")[1] == a.split("/")[-1]:
                 return a
 
-    return ""
+    for a in allowed:
+        if a.split("/")[-1] == config:
+            return a
+
+    return config
 
 
 # =========================
-# OCR 1 ẢNH
+# OCR 1 ẢNH (TỐI ƯU RAM)
 # =========================
 def process_single_image(path):
 
@@ -132,75 +245,90 @@ def process_single_image(path):
 
     img = cv2.imread(path)
     if img is None:
-        return data
+        return data, {"filename": path, "items": []}
+
+    img = shrink_for_ocr(img)
 
     h, w = img.shape[:2]
 
-    # crop bảng
-    img = img[int(h*0.25):int(h*0.8), int(w*0.1):int(w*0.95)]
+    gray = None
+    binary = None
+    results = None
+    image_counts = defaultdict(int)
+    detail_items = []
 
-    img = cv2.resize(img, None, fx=1.5, fy=1.5)
+    try:
+        # 🔥 crop nhỏ hơn để giảm noise + RAM
+        img = img[int(h * 0.3):int(h * 0.75), int(w * 0.1):int(w * 0.95)]
 
-    results = reader.readtext(img)
+        gray, binary = build_ocr_variants(img)
+        results = []
+        seen_lines = set()
 
-    lines = [r[1] for r in results]
+        for variant in (gray, binary):
+            for line in read_text_lines(variant):
+                normalized_line = normalize(line)
+                if normalized_line in seen_lines:
+                    continue
+                seen_lines.add(normalized_line)
+                results.append(normalized_line)
 
-    print("OCR:", lines)
+        for line in results:
+            if len(line) < 6:
+                continue
 
-    for line in lines:
+            brand, model = detect_brand_and_model(line)
+            if not model:
+                continue
 
-        l = normalize(line)
+            config = extract_config(line)
+            config = lock_config(model, config, brand)
+            label = make_label(model, config)
+            image_counts[(brand, label)] += 1
 
-        if len(l) < 6:
-            continue
+        detail_items = []
+        for (brand, label), qty in sorted(image_counts.items(), key=lambda item: (item[0][0], item[0][1])):
+            data[brand].extend([label] * qty)
+            detail_items.append(
+                {
+                    "brand": brand,
+                    "label": label,
+                    "qty": qty,
+                }
+            )
+    finally:
+        del img
+        if gray is not None:
+            del gray
+        if binary is not None:
+            del binary
+        if results is not None:
+            del results
+        del image_counts
+        gc.collect()
 
-        brand = None
-
-        if "iphone" in l:
-            brand = "apple"
-        elif "samsung" in l or "galaxy" in l:
-            brand = "samsung"
-        elif "oppo" in l:
-            brand = "oppo"
-        elif "realme" in l:
-            brand = "realme"
-        elif "xiaomi" in l or "redmi" in l or "poco" in l:
-            brand = "xiaomi"
-        elif "moto" in l:
-            brand = "motorola"
-
-        if not brand:
-            continue
-
-        model = match_model(l, brand)
-        if not model:
-            continue
-
-        config = extract_config(l)
-        config = lock_config(model, config, brand)
-
-        if config:
-            data[brand].append(f"{model} ({config})")
-        else:
-            data[brand].append(model)
-
-    return data
+    return data, {"filename": path, "items": detail_items}
 
 
 # =========================
-# MULTI IMAGE
+# MULTI IMAGE (STREAM)
 # =========================
 def process_images(image_paths):
 
     final = defaultdict(list)
+    details = []
 
-    for path in image_paths:
-        single = process_single_image(path)
+    try:
+        for path in image_paths:
+            single, detail = process_single_image(path)
+            details.append(detail)
 
-        for k, v in single.items():
-            final[k].extend(v)
+            for k, v in single.items():
+                final[k].extend(v)
+    finally:
+        clear_ocr_resources()
 
-    return final
+    return final, details
 
 
 # =========================

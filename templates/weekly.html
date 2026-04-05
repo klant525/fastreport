@@ -1,10 +1,297 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fast Reports Weekly</title>
+<style>
+:root {
+    --bg: #f3f5ef;
+    --card: rgba(255, 255, 255, 0.9);
+    --ink: #1f241d;
+    --muted: #66705f;
+    --line: rgba(31, 36, 29, 0.1);
+    --accent: #4f7b55;
+    --accent-dark: #35543a;
+    --shadow: 0 24px 60px rgba(33, 55, 38, 0.14);
+}
+
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-family: "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: radial-gradient(circle at top left, rgba(79, 123, 85, 0.14), transparent 30%), linear-gradient(180deg, #f8faf5 0%, var(--bg) 100%);
+}
+.container {
+    width: min(980px, 100%);
+    margin: 0 auto;
+    padding: 24px 16px 36px;
+}
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.nav {
+    display: inline-flex;
+    gap: 10px;
+    background: rgba(255,255,255,0.68);
+    padding: 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.7);
+}
+.nav a {
+    text-decoration: none;
+    color: var(--muted);
+    font-weight: 700;
+    padding: 10px 16px;
+    border-radius: 999px;
+}
+.nav a.active {
+    color: white;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+}
+.card {
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 28px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(16px);
+    min-width: 0;
+}
+.hero {
+    margin-bottom: 22px;
+}
+.hero h1, .card h2 {
+    margin: 0 0 10px;
+}
+.hero p, .helper {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.6;
+}
+.drop-zone {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 2px dashed rgba(79, 123, 85, 0.35);
+    border-radius: 22px;
+    min-height: 200px;
+    width: 100%;
+    padding: 24px 18px;
+    text-align: center;
+    background: linear-gradient(180deg, rgba(79, 123, 85, 0.08), rgba(255,255,255,0.75));
+    cursor: pointer;
+}
+.drop-zone strong {
+    display: block;
+    font-size: 20px;
+    margin-bottom: 6px;
+}
+.actions {
+    margin-top: 18px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+button {
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 18px;
+    font-weight: 700;
+    cursor: pointer;
+}
+button.primary {
+    color: white;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+}
+button.secondary {
+    background: white;
+    border: 1px solid var(--line);
+    color: var(--ink);
+}
+.badges {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+}
+.badge {
+    padding: 9px 13px;
+    border-radius: 999px;
+    background: white;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 14px;
+}
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+}
+.stat {
+    padding: 18px;
+    border-radius: 20px;
+    background: white;
+    border: 1px solid var(--line);
+}
+.stat .label {
+    color: var(--muted);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.stat .value {
+    margin-top: 8px;
+    font-size: 34px;
+    font-weight: 800;
+}
+.preview-grid {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+    gap: 12px;
+}
+.preview-grid img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 16px;
+    border: 1px solid rgba(31, 36, 29, 0.08);
+}
+.alert {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: rgba(166, 64, 44, 0.09);
+    border: 1px solid rgba(166, 64, 44, 0.12);
+    color: #8e3d2e;
+}
+@media (max-width: 720px) {
+    .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .container {
+        padding: 16px 12px 28px;
+    }
+
+    .card {
+        padding: 18px;
+    }
+
+    .nav {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .drop-zone {
+        min-height: 170px;
+        padding: 20px 14px;
+    }
+}
+</style>
+</head>
 <body>
-    <h2>Báo cáo TUẦN</h2>
-    <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="images" multiple>
-        <button type="submit">Chạy báo cáo tuần</button>
-    </form>
+<div class="container">
+    <div class="topbar">
+        <div>
+            <h1>Weekly Brand Counter</h1>
+            <p class="helper">Dem so anh co xuat hien tung hang. File tam va ket qua cu deu khong duoc giu lai tren web.</p>
+        </div>
+        <nav class="nav">
+            <a href="/">Daily</a>
+            <a class="active" href="/weekly">Weekly</a>
+        </nav>
+    </div>
+
+    <section class="card hero">
+        <h2>Upload anh tuan</h2>
+        <p class="helper">Moc weekly dem theo anh, tranh trung lap trong cung mot anh. Toi da 12 anh moi request.</p>
+
+        <form method="POST" enctype="multipart/form-data">
+            <label class="drop-zone" for="weeklyInput">
+                <strong>Chon anh cho bao cao tuan</strong>
+                <span>Anh ro ten hang se cho ket qua nhanh va de on dinh hon tren VPS RAM thap.</span>
+            </label>
+            <input id="weeklyInput" type="file" name="images" accept="image/*" multiple hidden>
+
+            <div class="badges">
+                <div class="badge" id="weeklyCount">0 anh da chon</div>
+                <div class="badge">Toi da 12 anh</div>
+                <div class="badge">
+                    {{ catalog_meta.get('source', 'base') }}
+                    {% if catalog_meta.get('updated_at') %}- {{ catalog_meta.get('updated_at')[:16].replace('T', ' ') }}{% endif %}
+                </div>
+                {% if file_count %}<div class="badge">Da xu ly {{ file_count }} anh</div>{% endif %}
+            </div>
+
+            {% if error %}
+            <div class="alert">{{ error }}</div>
+            {% endif %}
+
+            <div class="preview-grid" id="weeklyPreview"></div>
+
+            <div class="actions">
+                <button class="primary" type="submit">Chay bao cao tuan</button>
+                <button class="secondary" type="button" id="weeklyClear">Xoa anh</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Ket qua</h2>
+        {% if result %}
+        <div class="grid">
+            <div class="stat"><div class="label">Samsung</div><div class="value">{{ result.get('samsung', 0) }}</div></div>
+            <div class="stat"><div class="label">Apple</div><div class="value">{{ result.get('apple', 0) }}</div></div>
+            <div class="stat"><div class="label">Oppo</div><div class="value">{{ result.get('oppo', 0) }}</div></div>
+            <div class="stat"><div class="label">Xiaomi</div><div class="value">{{ result.get('xiaomi', 0) }}</div></div>
+            <div class="stat"><div class="label">Vivo</div><div class="value">{{ result.get('vivo', 0) }}</div></div>
+            <div class="stat"><div class="label">Realme</div><div class="value">{{ result.get('realme', 0) }}</div></div>
+            <div class="stat"><div class="label">Motorola</div><div class="value">{{ result.get('motorola', 0) }}</div></div>
+        </div>
+        {% else %}
+        <p class="helper">Chua co ket qua. Upload anh va chay mot request moi de xem thong ke.</p>
+        {% endif %}
+    </section>
+</div>
+<script>
+const weeklyInput = document.getElementById("weeklyInput");
+const weeklyPreview = document.getElementById("weeklyPreview");
+const weeklyCount = document.getElementById("weeklyCount");
+const weeklyClear = document.getElementById("weeklyClear");
+
+function renderWeeklyPreview(files) {
+    weeklyPreview.innerHTML = "";
+    weeklyCount.textContent = `${files.length} anh da chon`;
+
+    Array.from(files).slice(0, 12).forEach((file) => {
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(file);
+        img.onload = () => URL.revokeObjectURL(img.src);
+        weeklyPreview.appendChild(img);
+    });
+}
+
+weeklyInput.addEventListener("change", () => {
+    renderWeeklyPreview(weeklyInput.files);
+});
+
+weeklyClear.addEventListener("click", () => {
+    weeklyInput.value = "";
+    renderWeeklyPreview([]);
+});
+</script>
 </body>
 </html>
