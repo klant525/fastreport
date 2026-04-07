@@ -1,0 +1,18 @@
+:80 {
+    encode zstd gzip
+
+    @health path /healthz
+    reverse_proxy @health 127.0.0.1:8000
+
+    reverse_proxy 127.0.0.1:8000 {
+        transport http {
+            read_timeout 180s
+            write_timeout 180s
+            dial_timeout 10s
+        }
+    }
+
+    header {
+        -Server
+    }
+}

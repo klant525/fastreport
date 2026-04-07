@@ -1,0 +1,9 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+uploads
+.env
+.env.local
+learned_models.json

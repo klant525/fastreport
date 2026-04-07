@@ -1,80 +1,66 @@
-import cv2
-import gc
-import pytesseract
+﻿import gc
 from collections import defaultdict
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-cv2.setNumThreads(1)
+import cv2
 
-MAX_IMAGE_SIDE = 1080
+from ocr_backend import build_ocr_variants, cleanup_ocr_resources, extract_text_boxes, merge_boxes_to_lines, shrink_for_ocr
 
+MAX_IMAGE_SIDE = 960
 
-def shrink_for_ocr(img):
-    h, w = img.shape[:2]
-    longest = max(h, w)
-
-    if longest <= MAX_IMAGE_SIDE:
-        return img
-
-    scale = MAX_IMAGE_SIDE / float(longest)
-    new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
-    return cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
-
-
-def build_ocr_gray(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    return cv2.GaussianBlur(gray, (3, 3), 0)
 
 def process_images_weekly(image_paths):
-
     brands = defaultdict(int)
 
-    for path in image_paths:
+    try:
+        for path in image_paths:
+            img = cv2.imread(path)
+            if img is None:
+                continue
 
-        img = cv2.imread(path)
-        if img is None:
-            continue
+            gray = None
+            binary = None
 
-        img = shrink_for_ocr(img)
-        gray = build_ocr_gray(img)
-        text = pytesseract.image_to_string(gray)
+            try:
+                img = shrink_for_ocr(img, MAX_IMAGE_SIDE)
+                h, w = img.shape[:2]
+                img = img[int(h * 0.22):int(h * 0.82), int(w * 0.05):int(w * 0.98)]
+                gray, binary = build_ocr_variants(img)
 
-        lines = text.split("\n")
+                found = set()
+                seen_lines = set()
 
-        found = set()  # 👉 tránh đếm trùng trong 1 ảnh
+                for variant in (gray, binary):
+                    for _, line in merge_boxes_to_lines(extract_text_boxes(variant, psm=6)):
+                        lowered = line.lower().strip()
+                        if not lowered or lowered in seen_lines:
+                            continue
+                        seen_lines.add(lowered)
 
-        for line in lines:
+                        if "iphone" in lowered:
+                            found.add("apple")
+                        elif "samsung" in lowered or "galaxy" in lowered:
+                            found.add("samsung")
+                        elif "oppo" in lowered:
+                            found.add("oppo")
+                        elif "xiaomi" in lowered or "redmi" in lowered or "poco" in lowered:
+                            found.add("xiaomi")
+                        elif "vivo" in lowered:
+                            found.add("vivo")
+                        elif "realme" in lowered:
+                            found.add("realme")
+                        elif "motorola" in lowered or "moto" in lowered:
+                            found.add("motorola")
 
-            l = line.lower()
-
-            if "iphone" in l:
-                found.add("apple")
-
-            elif "samsung" in l or "galaxy" in l:
-                found.add("samsung")
-
-            elif "oppo" in l:
-                found.add("oppo")
-
-            elif "xiaomi" in l or "redmi" in l:
-                found.add("xiaomi")
-
-            elif "vivo" in l:
-                found.add("vivo")
-
-            elif "realme" in l:
-                found.add("realme")
-
-            elif "motorola" in l or "moto" in l:
-                found.add("motorola")
-
-        # 👉 cộng theo ảnh (logic tuần)
-        for b in found:
-            brands[b] += 1
-
-        del img
-        del gray
-        del text
-        gc.collect()
+                for brand in found:
+                    brands[brand] += 1
+            finally:
+                del img
+                if gray is not None:
+                    del gray
+                if binary is not None:
+                    del binary
+                gc.collect()
+    finally:
+        cleanup_ocr_resources()
 
     return brands

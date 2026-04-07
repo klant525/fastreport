@@ -19,8 +19,8 @@ BASE_MODEL_DB = {
         "s24","s24 plus","s24 ultra","s24 fe",
 
         # 🔥 Galaxy A
-        "a05","a05s","a06",
-        "a14","a15","a24","a25",
+        "a05","a05s","a06","a07","a07 5g",
+        "a14","a15","a17","a17 5g","a24","a25",
         "a34","a35","a36",
         "a54","a55","a56",
 
@@ -30,16 +30,18 @@ BASE_MODEL_DB = {
     ],
 
     "oppo": [
+        "a6 pro","find x9",
         "reno 14","reno 14 f","reno 14 pro",
         "reno 15","reno 15 f","reno 15 pro",
     ],
 
     "realme": [
         "realme note 60",
-        "c61","c65","c67","c71","c75"
+        "c61","c65","c67","c71","c75","c85"
     ],
 
     "xiaomi": [
+        "xiaomi 15t","xiaomi 15t 5g",
         "redmi note 14","redmi note 14 pro",
         "redmi note 15","redmi note 15 5g","redmi note 15 pro",
         "poco x5","poco x6","poco x7","poco x7 pro"

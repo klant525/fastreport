@@ -8,6 +8,8 @@ from urllib.request import Request, urlopen
 
 CACHE_PATH = os.path.join(os.path.dirname(__file__), "tgdd_catalog_cache.json")
 CACHE_VERSION = 2
+SHORT_CACHE_PATH = os.path.join(os.path.dirname(__file__), "short_catalog_cache.json")
+SHORT_CACHE_VERSION = 1
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0 Safari/537.36"
 BRAND_URLS = {
     "apple": "https://www.thegioididong.com/dtdd-apple-iphone",
@@ -16,6 +18,11 @@ BRAND_URLS = {
     "realme": "https://www.thegioididong.com/dtdd-realme",
     "xiaomi": "https://www.thegioididong.com/dtdd-xiaomi",
     "motorola": "https://www.thegioididong.com/dtdd-motorola",
+}
+SHORT_URLS = {
+    "audio": "https://www.thegioididong.com/tai-nghe",
+    "watch": "https://www.thegioididong.com/dong-ho-thong-minh",
+    "tablet": "https://www.thegioididong.com/may-tinh-bang",
 }
 
 
@@ -169,6 +176,82 @@ def _config_sort_key(value):
     return (int(ram), rom_value)
 
 
+def _clean_short_name(text):
+    text = re.split(r"\d[\d\.,]*\s*₫", text, maxsplit=1)[0]
+    text = re.sub(r"\b(mẫu mới|online giá rẻ quá|trả chậm 0%|trả trước 0đ|giảm sốc|hot|độc quyền)\b", " ", text, flags=re.I)
+    text = re.sub(r"\s+", " ", text).strip(" -")
+    return text
+
+
+def _is_valid_short_name(category, name):
+    lowered = name.lower()
+    banned = (
+        "xóa tất cả",
+        "bỏ chọn",
+        "bluetooth",
+        "có dây",
+        "truewireless",
+        "chụp tai",
+        "tai nghe bluetooth hãng nào tốt nhất",
+        "tai nghe dẫn truyền qua xương là gì",
+    )
+    if any(token in lowered for token in banned):
+        return False
+
+    if category == "audio":
+        keywords = ("tai nghe", "airpods", "buds", "ows")
+        return any(keyword in lowered for keyword in keywords)
+
+    if category == "watch":
+        keywords = ("watch", "band", "kidcare", "garmin")
+        return any(keyword in lowered for keyword in keywords)
+
+    if category == "tablet":
+        keywords = ("ipad", "pad", "tab")
+        return any(keyword in lowered for keyword in keywords)
+
+    return True
+
+
+def _short_href_match(category, href):
+    if category == "audio":
+        return "/tai-nghe" in href
+    if category == "watch":
+        return "/dong-ho-thong-minh/" in href or "/smartwatch/" in href
+    if category == "tablet":
+        return "/may-tinh-bang/" in href
+    return False
+
+
+def _scrape_short_catalog(category, url):
+    html = _read_url(url)
+    parser = AnchorCollector()
+    parser.feed(html)
+
+    names = []
+    for href, text in parser.links:
+        if not href or not text or not _short_href_match(category, href):
+            continue
+
+        name = _clean_short_name(text)
+        if len(name) < 4:
+            continue
+        if not _is_valid_short_name(category, name):
+            continue
+        names.append(name)
+
+    deduped = []
+    seen = set()
+    for name in names:
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(name)
+
+    return deduped
+
+
 def _scrape_brand_catalog(brand, url):
     html = _read_url(url)
     parser = AnchorCollector()
@@ -207,9 +290,37 @@ def _load_cache_meta():
         return {}
 
 
+def _load_short_cache_meta():
+    if not os.path.exists(SHORT_CACHE_PATH):
+        return {}
+
+    try:
+        with open(SHORT_CACHE_PATH, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def _is_cache_fresh(max_age_hours):
     cache = _load_cache_meta()
     if cache.get("version") != CACHE_VERSION:
+        return False
+
+    updated_at = cache.get("updated_at")
+    if not updated_at:
+        return False
+
+    try:
+        dt = datetime.fromisoformat(updated_at)
+    except ValueError:
+        return False
+
+    return datetime.now(timezone.utc) - dt < timedelta(hours=max_age_hours)
+
+
+def _is_short_cache_fresh(max_age_hours):
+    cache = _load_short_cache_meta()
+    if cache.get("version") != SHORT_CACHE_VERSION:
         return False
 
     updated_at = cache.get("updated_at")
@@ -257,8 +368,45 @@ def refresh_tgdd_catalog():
     return True
 
 
+def refresh_short_catalog():
+    payload_data = {}
+
+    for category, url in SHORT_URLS.items():
+        try:
+            names = _scrape_short_catalog(category, url)
+        except URLError:
+            continue
+        except Exception:
+            continue
+
+        if names:
+            payload_data[category] = names
+
+    if not payload_data:
+        return False
+
+    payload = {
+        "version": SHORT_CACHE_VERSION,
+        "source": "tgdd",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "data": payload_data,
+    }
+
+    with open(SHORT_CACHE_PATH, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False, indent=2)
+
+    return True
+
+
 def ensure_tgdd_catalog(max_age_hours=12):
     if _is_cache_fresh(max_age_hours):
         return False
 
     return refresh_tgdd_catalog()
+
+
+def ensure_short_catalog(max_age_hours=12):
+    if _is_short_cache_fresh(max_age_hours):
+        return False
+
+    return refresh_short_catalog()

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ seo.title if seo else page_title }}</title>
+<meta name="description" content="{{ seo.description if seo else page_title }}">
+<link rel="canonical" href="{{ seo.canonical_url if seo else '/' }}">
+<meta name="robots" content="index,follow">
+<meta property="og:title" content="{{ seo.title if seo else page_title }}">
+<meta property="og:description" content="{{ seo.description if seo else page_title }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ seo.canonical_url if seo else '/' }}">
+<style>
+body { margin: 0; font-family: "Segoe UI", sans-serif; background: #f5f3ee; color: #1f1a16; }
+.container { width: min(1040px, 100%); margin: 0 auto; padding: 24px 16px 40px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; }
+.nav { display: inline-flex; gap: 8px; background: rgba(255,255,255,0.75); padding: 8px; border-radius: 999px; }
+.nav a { text-decoration: none; color: #6b6258; font-weight: 700; padding: 10px 14px; border-radius: 999px; }
+.nav a.active { color: white; background: #cd6b45; }
+.layout { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.card { background: rgba(255,255,255,0.86); border-radius: 24px; padding: 22px; box-shadow: 0 18px 40px rgba(0,0,0,0.08); min-width: 0; }
+.drop-zone { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 200px; width: 100%; margin-top: 16px; border: 2px dashed rgba(205,107,69,0.35); border-radius: 22px; padding: 20px; text-align: center; background: linear-gradient(180deg, rgba(205,107,69,0.08), rgba(255,255,255,0.7)); cursor: pointer; }
+.badges, .actions, .detail-list { display: flex; gap: 10px; flex-wrap: wrap; }
+.badges { margin-top: 16px; }
+.badge { padding: 9px 13px; border-radius: 999px; background: white; color: #6b6258; border: 1px solid rgba(0,0,0,0.08); font-size: 14px; }
+.preview-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 12px; }
+.preview-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; }
+button { border: 0; border-radius: 999px; padding: 12px 18px; font-weight: 700; cursor: pointer; }
+button.primary { color: white; background: #cd6b45; }
+button.secondary { background: white; border: 1px solid rgba(0,0,0,0.08); }
+textarea { width: 100%; min-height: 360px; border: 0; border-radius: 18px; padding: 16px; background: #111; color: #f2efe9; font: 500 14px/1.6 "Consolas", monospace; }
+.detail-list { margin-top: 14px; display: grid; }
+.detail-item { padding: 14px 16px; border-radius: 16px; background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.08); }
+.alert { margin-top: 14px; padding: 14px 16px; border-radius: 14px; background: rgba(180,70,50,0.08); color: #923725; }
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .nav { width: 100%; justify-content: space-between; } }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="topbar">
+        <div>
+            <h1 style="margin:0;">{{ page_title }}</h1>
+            <p style="margin:8px 0 0;color:#6b6258;">Bao cao OCR cho danh muc ngan TGDD dang kinh doanh.</p>
+        </div>
+        <nav class="nav">
+            <a href="/">Daily</a>
+            <a href="/weekly">Weekly</a>
+            <a class="{{ 'active' if route_name == 'accessories' else '' }}" href="/accessories">Accessories</a>
+            <a class="{{ 'active' if route_name == 'tablets' else '' }}" href="/tablets">Tablets</a>
+        </nav>
+    </div>
+
+    <div class="layout">
+        <section class="card">
+            <form method="POST" enctype="multipart/form-data" id="shortForm" autocomplete="off">
+                <label class="drop-zone" id="dropZone">
+                    <strong>Keo tha anh vao day</strong>
+                    <span>Chon 1 lan la tu dong chay bao cao.</span>
+                    <input type="file" name="images" id="fileInput" accept="image/*" multiple hidden>
+                </label>
+
+                <div class="badges">
+                    <div class="badge" id="fileCountBadge">0 anh da chon</div>
+                    <div class="badge">{{ catalog_meta.get('source', 'base') }}</div>
+                    {% if catalog_meta.get('updated_at') %}<div class="badge">{{ catalog_meta.get('updated_at')[:16].replace('T', ' ') }}</div>{% endif %}
+                </div>
+
+                {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+
+                <div class="preview-grid" id="previewGrid"></div>
+
+                <div class="actions" style="margin-top:16px;">
+                    <button class="primary" type="submit" id="submitButton">Chay bao cao</button>
+                    <button class="secondary" type="button" id="clearButton">Xoa anh</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="card">
+            <h2 style="margin-top:0;">Ket qua</h2>
+            {% if report %}
+            <textarea readonly id="resultBox" autocomplete="off" spellcheck="false">{{ report }}</textarea>
+            {% else %}
+            <p style="color:#6b6258;">Chua co ket qua.</p>
+            {% endif %}
+
+            {% if details %}
+            <div class="detail-list">
+                {% for item in details %}
+                <div class="detail-item">
+                    <strong>Anh {{ loop.index }}</strong>
+                    {% if item["items"] %}
+                        {% for matched in item["items"] %}
+                        <div style="margin-top:6px; color:#6b6258;">{{ matched.qty }} x {{ matched.label }}</div>
+                        {% endfor %}
+                    {% else %}
+                    <div style="margin-top:6px; color:#6b6258;">Khong nhan ra san pham nao.</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+<script>
+const maxFiles = 12;
+const form = document.getElementById("shortForm");
+const fileInput = document.getElementById("fileInput");
+const dropZone = document.getElementById("dropZone");
+const previewGrid = document.getElementById("previewGrid");
+const fileCountBadge = document.getElementById("fileCountBadge");
+const submitButton = document.getElementById("submitButton");
+const clearButton = document.getElementById("clearButton");
+const dataTransfer = new DataTransfer();
+let autoSubmitTimer = null;
+
+function syncInput() {
+  fileInput.files = dataTransfer.files;
+  const count = dataTransfer.files.length;
+  fileCountBadge.textContent = `${count} anh da chon`;
+  submitButton.disabled = count === 0;
+}
+
+function renderPreview() {
+  previewGrid.innerHTML = "";
+  Array.from(dataTransfer.files).forEach((file) => {
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(file);
+    img.onload = () => URL.revokeObjectURL(img.src);
+    previewGrid.appendChild(img);
+  });
+}
+
+function queueAutoSubmit() {
+  if (autoSubmitTimer) clearTimeout(autoSubmitTimer);
+  if (dataTransfer.files.length === 0) return;
+  autoSubmitTimer = setTimeout(() => form.requestSubmit(), 250);
+}
+
+function ingestFiles(fileList) {
+  for (const file of Array.from(fileList)) {
+    if (dataTransfer.files.length >= maxFiles) break;
+    if (file.type && !file.type.startsWith("image/")) continue;
+    dataTransfer.items.add(file);
+  }
+  syncInput();
+  renderPreview();
+}
+
+dropZone.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", (e) => { dataTransfer.items.clear(); ingestFiles(e.target.files); queueAutoSubmit(); });
+dropZone.addEventListener("dragover", (e) => { e.preventDefault(); });
+dropZone.addEventListener("drop", (e) => { e.preventDefault(); dataTransfer.items.clear(); ingestFiles(e.dataTransfer.files); queueAutoSubmit(); });
+clearButton.addEventListener("click", () => { if (autoSubmitTimer) clearTimeout(autoSubmitTimer); dataTransfer.items.clear(); syncInput(); renderPreview(); });
+syncInput();
+</script>
+</body>
+</html>

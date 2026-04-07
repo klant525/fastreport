@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fast Reports Weekly</title>
+<title>{{ seo.title if seo else 'FastReport Weekly' }}</title>
+<meta name="description" content="{{ seo.description if seo else 'FastReport weekly OCR report' }}">
+<link rel="canonical" href="{{ seo.canonical_url if seo else '/weekly' }}">
+<meta name="robots" content="index,follow">
+<meta property="og:title" content="{{ seo.title if seo else 'FastReport Weekly' }}">
+<meta property="og:description" content="{{ seo.description if seo else 'FastReport weekly OCR report' }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ seo.canonical_url if seo else '/weekly' }}">
 <style>
 :root {
     --bg: #f3f5ef;
@@ -150,6 +157,10 @@ button.secondary {
     text-transform: uppercase;
     letter-spacing: 0.08em;
 }
+.stat .flag {
+    font-size: 20px;
+    line-height: 1;
+}
 .stat .value {
     margin-top: 8px;
     font-size: 34px;
@@ -212,6 +223,8 @@ button.secondary {
         <nav class="nav">
             <a href="/">Daily</a>
             <a class="active" href="/weekly">Weekly</a>
+            <a href="/accessories">Accessories</a>
+            <a href="/tablets">Tablets</a>
         </nav>
     </div>
 
@@ -219,7 +232,7 @@ button.secondary {
         <h2>Upload anh tuan</h2>
         <p class="helper">Moc weekly dem theo anh, tranh trung lap trong cung mot anh. Toi da 12 anh moi request.</p>
 
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST" enctype="multipart/form-data" autocomplete="off">
             <label class="drop-zone" for="weeklyInput">
                 <strong>Chon anh cho bao cao tuan</strong>
                 <span>Anh ro ten hang se cho ket qua nhanh va de on dinh hon tren VPS RAM thap.</span>
@@ -253,13 +266,13 @@ button.secondary {
         <h2>Ket qua</h2>
         {% if result %}
         <div class="grid">
-            <div class="stat"><div class="label">Samsung</div><div class="value">{{ result.get('samsung', 0) }}</div></div>
-            <div class="stat"><div class="label">Apple</div><div class="value">{{ result.get('apple', 0) }}</div></div>
-            <div class="stat"><div class="label">Oppo</div><div class="value">{{ result.get('oppo', 0) }}</div></div>
-            <div class="stat"><div class="label">Xiaomi</div><div class="value">{{ result.get('xiaomi', 0) }}</div></div>
-            <div class="stat"><div class="label">Vivo</div><div class="value">{{ result.get('vivo', 0) }}</div></div>
-            <div class="stat"><div class="label">Realme</div><div class="value">{{ result.get('realme', 0) }}</div></div>
-            <div class="stat"><div class="label">Motorola</div><div class="value">{{ result.get('motorola', 0) }}</div></div>
+            <div class="stat"><div class="flag">🇰🇷</div><div class="label">Samsung</div><div class="value">{{ result.get('samsung', 0) }}</div></div>
+            <div class="stat"><div class="flag">🇺🇸</div><div class="label">Apple</div><div class="value">{{ result.get('apple', 0) }}</div></div>
+            <div class="stat"><div class="flag">🇨🇳</div><div class="label">Oppo</div><div class="value">{{ result.get('oppo', 0) }}</div></div>
+            <div class="stat"><div class="flag">🇨🇳</div><div class="label">Xiaomi</div><div class="value">{{ result.get('xiaomi', 0) }}</div></div>
+            <div class="stat"><div class="flag">🇨🇳</div><div class="label">Vivo</div><div class="value">{{ result.get('vivo', 0) }}</div></div>
+            <div class="stat"><div class="flag">🇨🇳</div><div class="label">Realme</div><div class="value">{{ result.get('realme', 0) }}</div></div>
+            <div class="stat"><div class="flag">🇺🇸</div><div class="label">Motorola</div><div class="value">{{ result.get('motorola', 0) }}</div></div>
         </div>
         {% else %}
         <p class="helper">Chua co ket qua. Upload anh va chay mot request moi de xem thong ke.</p>

@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fast Reports</title>
+<title>{{ seo.title if seo else 'FastReport' }}</title>
+<meta name="description" content="{{ seo.description if seo else 'FastReport OCR' }}">
+<link rel="canonical" href="{{ seo.canonical_url if seo else '/' }}">
+<meta name="robots" content="index,follow">
+<meta property="og:title" content="{{ seo.title if seo else 'FastReport' }}">
+<meta property="og:description" content="{{ seo.description if seo else 'FastReport OCR' }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ seo.canonical_url if seo else '/' }}">
 <style>
 :root {
     --bg: #f6f1e8;
@@ -239,6 +246,52 @@ button:hover,
     font-size: 14px;
 }
 
+.toggle-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: white;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    appearance: none;
+}
+
+.toggle-indicator {
+    width: 40px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(34, 29, 24, 0.14);
+    position: relative;
+    transition: background 0.18s ease;
+}
+
+.toggle-indicator::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    transition: transform 0.18s ease;
+}
+
+.toggle-pill.active .toggle-indicator {
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+}
+
+.toggle-pill.active .toggle-indicator::after {
+    transform: translateX(18px);
+}
+
 .preview-grid {
     margin-top: 18px;
     display: grid;
@@ -356,6 +409,36 @@ textarea {
     word-break: break-word;
 }
 
+.debug-block {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+}
+
+.debug-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin-bottom: 6px;
+}
+
+.debug-lines {
+    display: grid;
+    gap: 6px;
+}
+
+.debug-line {
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(34, 29, 24, 0.05);
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+    color: var(--ink);
+    word-break: break-word;
+}
+
 .footer-note {
     margin-top: 16px;
     font-size: 13px;
@@ -411,6 +494,8 @@ textarea {
         <nav class="nav">
             <a class="active" href="/">Daily</a>
             <a href="/weekly">Weekly</a>
+            <a href="/accessories">Accessories</a>
+            <a href="/tablets">Tablets</a>
         </nav>
     </div>
 
@@ -419,17 +504,27 @@ textarea {
             <h2 class="section-title">Tai anh len de chay bao cao</h2>
             <p class="section-text">Toi uu cho VPS RAM thap: gioi han toi da 12 anh moi lan, xu ly xong se xoa file tam ngay.</p>
 
-            <form method="POST" enctype="multipart/form-data" id="uploadForm">
+            <form method="POST" enctype="multipart/form-data" id="uploadForm" autocomplete="off">
                 <label class="drop-zone" id="dropZone">
                     <strong>Keo tha anh vao day</strong>
                     <span>Hoac bam de chon nhieu anh tu may. Nen dung anh crop ro model de OCR nhanh hon.</span>
                     <input type="file" name="images" id="fileInput" accept="image/*" multiple hidden>
                 </label>
+                <input type="hidden" name="use_gpt" id="useGptInput" value="{{ '1' if use_gpt else '0' }}">
 
                 <div class="meta-row">
                     <div class="badge" id="fileCountBadge">0 anh da chon</div>
                     <div class="badge">Toi da 12 anh / lan</div>
                     <div class="badge">Khong luu ket qua cu</div>
+                    {% if vision_meta and vision_meta.get('available') %}
+                    <button class="toggle-pill {% if use_gpt %}active{% endif %}" id="gptToggle" type="button" aria-pressed="{{ 'true' if use_gpt else 'false' }}">
+                        <span>GPT mode</span>
+                        <span class="toggle-indicator"></span>
+                    </button>
+                    <div class="badge">{{ vision_meta.get('model') }} | GPT-first</div>
+                    {% else %}
+                    <div class="badge">GPT mode: unavailable</div>
+                    {% endif %}
                     <div class="badge">
                         {{ catalog_meta.get('source', 'base') }}
                         {% if catalog_meta.get('updated_at') %}- {{ catalog_meta.get('updated_at')[:16].replace('T', ' ') }}{% endif %}
@@ -468,7 +563,7 @@ textarea {
 
                 {% if report %}
                 <div class="result-shell">
-                    <textarea id="resultBox" readonly>{{ report }}</textarea>
+                    <textarea id="resultBox" readonly autocomplete="off" spellcheck="false">{{ report }}</textarea>
                 </div>
                 {% else %}
                 <div class="empty-state">
@@ -479,7 +574,7 @@ textarea {
 
             <section class="card tips">
                 <h2 class="section-title">Meo de OCR nhanh va dung</h2>
-                <p class="section-text">Voi VPS 1GB RAM, mot vai dieu nho se giup OCR on dinh hon.</p>
+                <p class="section-text">Voi VPS 1GB RAM, mac dinh app dung local OCR nhe. Neu ban bat GPT mode, ket qua se uu tien dong GPT nhan ra de tang do chinh xac.</p>
                 <ul>
                     <li>Dung anh crop gan khu vuc ten may va cau hinh thay vi chup nguyen man hinh dai.</li>
                     <li>Tranh tai mot luc qua nhieu anh lon, he thong da tu gioi han 12 anh moi request.</li>
@@ -490,7 +585,7 @@ textarea {
             {% if details %}
             <section class="card tips">
                 <h2 class="section-title">Ket qua tung anh</h2>
-                <p class="section-text">Moi anh duoc chot 1 model/config tot nhat, sau do moi cong don vao bao cao tong.</p>
+                <p class="section-text">Moi anh giu toan bo match hop le, sau do cong don thang vao bao cao tong.</p>
                 <div class="detail-list">
                     {% for item in details %}
                     <div class="detail-item">
@@ -503,6 +598,32 @@ textarea {
                             {% else %}
                             Khong nhan ra model nao tu anh nay.
                             {% endif %}
+                        </div>
+                        <div class="debug-block">
+                            <div class="debug-label">Local OCR Doc Ra</div>
+                            <div class="debug-lines">
+                                {% if item["local_ocr_lines"] %}
+                                {% for line in item["local_ocr_lines"] %}
+                                <div class="debug-line">{{ line }}</div>
+                                {% endfor %}
+                                {% else %}
+                                <div class="debug-line">Khong co dong nao tu local OCR.</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="debug-block">
+                            <div class="debug-label">GPT Doc Ra</div>
+                            <div class="debug-lines">
+                                {% if item["gpt_lines"] %}
+                                {% for line in item["gpt_lines"] %}
+                                <div class="debug-line">{{ line }}</div>
+                                {% endfor %}
+                                {% elif item["used_gpt"] %}
+                                <div class="debug-line">GPT duoc goi nhung khong tra ve dong hop le.</div>
+                                {% else %}
+                                <div class="debug-line">Khong goi GPT cho anh nay.</div>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                     {% endfor %}
@@ -525,6 +646,8 @@ const submitButton = document.getElementById("submitButton");
 const resultBox = document.getElementById("resultBox");
 const copyButton = document.getElementById("copyButton");
 const downloadButton = document.getElementById("downloadButton");
+const useGptInput = document.getElementById("useGptInput");
+const gptToggle = document.getElementById("gptToggle");
 
 const dataTransfer = new DataTransfer();
 let autoSubmitTimer = null;
@@ -585,6 +708,21 @@ function ingestFiles(fileList) {
 
     syncInput();
     renderPreview();
+}
+
+if (gptToggle && useGptInput) {
+    const syncGptToggle = () => {
+        const enabled = useGptInput.value === "1";
+        gptToggle.classList.toggle("active", enabled);
+        gptToggle.setAttribute("aria-pressed", enabled ? "true" : "false");
+    };
+
+    gptToggle.addEventListener("click", () => {
+        useGptInput.value = useGptInput.value === "1" ? "0" : "1";
+        syncGptToggle();
+    });
+
+    syncGptToggle();
 }
 
 dropZone.addEventListener("click", () => fileInput.click());
