@@ -8,7 +8,7 @@ from catalog_runtime import get_config_map, get_model_db
 from ocr_backend import build_ocr_variants, cleanup_ocr_resources, extract_text_boxes, merge_boxes_to_lines, shrink_for_ocr
 from openai_vision import extract_phone_lines
 
-MAX_IMAGE_SIDE = 960
+MAX_IMAGE_SIDE = 1180
 
 
 def normalize(text):
@@ -250,7 +250,9 @@ def lock_config(model, config, brand):
     return config
 
 
-def collect_matches(lines, image_counts):
+def collect_matches(lines):
+    matched_rows = []
+
     for line in lines:
         if len(line) < 5 or not is_product_like_line(line):
             continue
@@ -262,7 +264,9 @@ def collect_matches(lines, image_counts):
         config = extract_config(line)
         config = lock_config(model, config, brand)
         label = make_label(model, config)
-        image_counts[(brand, label)] += 1
+        matched_rows.append((brand, label, line))
+
+    return matched_rows
 
 
 def line_fingerprint(text):
@@ -275,7 +279,7 @@ def line_fingerprint(text):
     return text
 
 
-def row_bucket(y_center, size=14):
+def row_bucket(y_center, size=8):
     return int(round(float(y_center) / float(size)))
 
 
@@ -299,7 +303,6 @@ def process_single_image(path, use_gpt=False):
     gray = None
     binary = None
     results = None
-    image_counts = defaultdict(int)
     detail_items = []
     local_debug_lines = []
     gpt_debug_lines = []
@@ -307,22 +310,17 @@ def process_single_image(path, use_gpt=False):
     used_gpt = False
 
     try:
-        img = img[int(h * 0.24):int(h * 0.8), int(w * 0.06):int(w * 0.97)]
+        img = img[int(h * 0.17):int(h * 0.88), int(w * 0.04):int(w * 0.985)]
         results = []
-        seen_line_keys = set()
         gray, binary = build_ocr_variants(img)
 
-        for variant in (gray, binary):
-            merged_lines = merge_boxes_to_lines(extract_text_boxes(variant, psm=6))
-            for y_center, line in merged_lines:
-                normalized_line = normalize(line)
-                fingerprint = line_fingerprint(normalized_line)
-                line_key = (row_bucket(y_center), fingerprint)
-                if not normalized_line or line_key in seen_line_keys:
-                    continue
-                seen_line_keys.add(line_key)
-                results.append(normalized_line)
-                local_debug_lines.append(normalized_line)
+        merged_lines = merge_boxes_to_lines(extract_text_boxes(binary, psm=6))
+        for _y_center, line in merged_lines:
+            normalized_line = normalize(line)
+            if not normalized_line:
+                continue
+            results.append(normalized_line)
+            local_debug_lines.append(normalized_line)
 
         if use_gpt:
             gpt_lines = extract_phone_lines(path, enabled=True)
@@ -337,11 +335,11 @@ def process_single_image(path, use_gpt=False):
         if use_gpt and gpt_match_lines:
             source_lines = gpt_match_lines
 
-        collect_matches(source_lines, image_counts)
+        matched_rows = collect_matches(source_lines)
 
-        for (brand, label), qty in sorted(image_counts.items(), key=lambda item: (item[0][0], item[0][1])):
-            data[brand].extend([label] * qty)
-            detail_items.append({"brand": brand, "label": label, "qty": qty})
+        for brand, label, raw_line in matched_rows:
+            data[brand].append(label)
+            detail_items.append({"brand": brand, "label": label, "raw_line": raw_line})
     finally:
         del img
         if gray is not None:
@@ -350,7 +348,6 @@ def process_single_image(path, use_gpt=False):
             del binary
         if results is not None:
             del results
-        del image_counts
         gc.collect()
 
     return data, {
@@ -391,17 +388,11 @@ def format_report(data):
 
     def build(name, flag):
         items = data.get(name, [])
-        count = {}
-
-        for item in items:
-            key = item.lower()
-            count[key] = count.get(key, 0) + 1
-
-        total = sum(count.values())
+        total = len(items)
         text = f"{flag} {name.upper()}:\n"
 
-        for model, qty in sorted(count.items()):
-            text += f"{qty} {model}\n"
+        for model in items:
+            text += f"{model.lower()}\n"
 
         text += f"\nTotal: {total}\n\n"
         return text

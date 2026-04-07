@@ -593,7 +593,10 @@ textarea {
                         <div class="detail-meta">
                             {% if item["items"] %}
                             {% for matched in item["items"] %}
-                            <div>{{ matched.qty }} x {{ matched.label }} | brand: {{ matched.brand }}</div>
+                            <div>{{ matched.label }} | brand: {{ matched.brand }}</div>
+                            {% if matched.raw_line %}
+                            <div style="opacity:.72;">raw: {{ matched.raw_line }}</div>
+                            {% endif %}
                             {% endfor %}
                             {% else %}
                             Khong nhan ra model nao tu anh nay.
